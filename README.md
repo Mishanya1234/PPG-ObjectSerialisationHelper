@@ -2,10 +2,9 @@
 
 Usage:
 ```
-UnityEngine.Object.Destroy(myGameObject.GetComponent<Optout>());
 GameObject[] childrenToSerialise = new[]
 {
-    myGameObject
+    myChild1
 };
 if (Instance.TryGetComponent(out ObjectSerialisationHelper serialisationHelper))
 {
