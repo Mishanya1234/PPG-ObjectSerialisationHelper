@@ -6,7 +6,6 @@ using static Messages;
 
 public class ObjectSerialisationHelper : MonoBehaviour, IOnBeforeSerialise, IOnAfterDeserialise
 {
-    public GameObject[] ChildrenToSerialise;
     public GameObjectState[] ChildrenState;
     private static readonly Type[] _nonSerialisableComponentTypes = new Type[]
     {
@@ -14,15 +13,28 @@ public class ObjectSerialisationHelper : MonoBehaviour, IOnBeforeSerialise, IOnA
         typeof(ContextMenuOptionComponent),
         typeof(DecalControllerBehaviour)
     };
+    private GameObject[] _childrenToSerialise = Array.Empty<GameObject>();
     private List<(MonoBehaviourPrototype, MonoBehaviour)> _foundChildComponents;
+
+    public GameObject[] ChildrenToSerialise
+    {
+        get => _childrenToSerialise;
+        set
+        {
+            foreach (var child in value)
+                child.GetOrAddComponent<Optout>();
+            _childrenToSerialise = value;
+        }
+    }
 
     public void InjectStateIntoChildren()
     {
         _foundChildComponents = new List<(MonoBehaviourPrototype, MonoBehaviour)>();
-        for (int i = 0; i < ChildrenState.Length; i++)
+        var minLength = Math.Min(ChildrenState.Length, ChildrenToSerialise.Length);
+        for (int i = 0; i < minLength; i++)
         {
             var childState = ChildrenState[i];
-            var child = ChildrenToSerialise[i];
+            var child = _childrenToSerialise[i];
 
             var childTransform = child.transform;
             childTransform.localPosition = childState.Transform.RelativePosition;
@@ -58,10 +70,10 @@ public class ObjectSerialisationHelper : MonoBehaviour, IOnBeforeSerialise, IOnA
     }
     public void OnBeforeSerialise()
     {
-        ChildrenState = new GameObjectState[ChildrenToSerialise.Length];
-        for (int i = 0; i < ChildrenToSerialise.Length; i++)
+        ChildrenState = new GameObjectState[_childrenToSerialise.Length];
+        for (int i = 0; i < _childrenToSerialise.Length; i++)
         {
-            var child = ChildrenToSerialise[i];
+            var child = _childrenToSerialise[i];
             var childTransform = child.transform;
             
             var childComponentsState = new List<MonoBehaviourPrototype>();
@@ -90,26 +102,13 @@ public class ObjectSerialisationHelper : MonoBehaviour, IOnBeforeSerialise, IOnA
     }
     private IEnumerator Start()
     {
+        foreach (var child in _childrenToSerialise)
+            child.GetOrAddComponent<SerialisableIdentity>().Regenerate();
+
         yield return new WaitForEndOfFrame();
 
-        var serialiseInstructions = GetComponentInParent<SerialiseInstructions>();
-        var gameSerialisedChildrenCount = ChildrenToSerialise.Length;
-        foreach (var child in ChildrenToSerialise)
-            if (child.TryGetComponent(out Optout optout))
-            {
-                Destroy(optout);
-                gameSerialisedChildrenCount--;
-            }
-
-        var relevantTransforms = new Transform[serialiseInstructions.RelevantTransforms.Length - gameSerialisedChildrenCount];
-        var nextIndex = 0;
-        foreach (var relevantTransform in serialiseInstructions.RelevantTransforms)
-            if (Array.IndexOf(ChildrenToSerialise, relevantTransform.gameObject) == -1)
-                relevantTransforms[nextIndex++] = relevantTransform;
-        serialiseInstructions.RelevantTransforms = relevantTransforms;
-
-        foreach (var child in ChildrenToSerialise)
-            child.GetOrAddComponent<SerialisableIdentity>().Regenerate();
+        foreach (var child in _childrenToSerialise)
+            Destroy(child.GetComponent<Optout>());
     }
 
     public struct GameObjectState
