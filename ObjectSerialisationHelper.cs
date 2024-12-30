@@ -93,18 +93,23 @@ public class ObjectSerialisationHelper : MonoBehaviour, IOnBeforeSerialise, IOnA
         yield return new WaitForEndOfFrame();
 
         var serialiseInstructions = GetComponentInParent<SerialiseInstructions>();
-        var relevantTransforms = new Transform[serialiseInstructions.RelevantTransforms.Length - ChildrenToSerialise.Length];
-        for (int i = 0; i < relevantTransforms.Length; i++)
-            foreach (var relevantTransform in serialiseInstructions.RelevantTransforms)
-                if (Array.IndexOf(ChildrenToSerialise, relevantTransform.gameObject) == -1)
-                {
-                    relevantTransforms[i] = relevantTransform;
-                    break;
-                }
+        var gameSerialisedChildrenCount = ChildrenToSerialise.Length;
+        foreach (var child in ChildrenToSerialise)
+            if (child.TryGetComponent(out Optout optout))
+            {
+                Destroy(optout);
+                gameSerialisedChildrenCount--;
+            }
+
+        var relevantTransforms = new Transform[serialiseInstructions.RelevantTransforms.Length - gameSerialisedChildrenCount];
+        var nextIndex = 0;
+        foreach (var relevantTransform in serialiseInstructions.RelevantTransforms)
+            if (Array.IndexOf(ChildrenToSerialise, relevantTransform.gameObject) == -1)
+                relevantTransforms[nextIndex++] = relevantTransform;
         serialiseInstructions.RelevantTransforms = relevantTransforms;
 
         foreach (var child in ChildrenToSerialise)
-            child.GetComponent<SerialisableIdentity>().Regenerate();
+            child.GetOrAddComponent<SerialisableIdentity>().Regenerate();
     }
 
     public struct GameObjectState
