@@ -1,7 +1,7 @@
 # ObjectSerialisationHelper - component for saving child objects created in AfterSpawn
 
 Usage:
-```
+```csharp
 GameObject[] childrenToSerialise = new[]
 {
     myChild1
